@@ -1,5 +1,5 @@
 name = "free-image-generation-api"
-main = "src/index.js" # or whatever your entry file is named
+main = "worker.js"
 compatibility_date = "2026-01-01"
 
 [ai]

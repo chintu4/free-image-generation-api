@@ -14,46 +14,41 @@ export default {
                 return json({ error: "Prompt is required" }, 400);
             }
 
-            const decodeB64 = (b64) => {
-                const bin = atob(b64);
-                const arr = new Uint8Array(bin.length);
-                for (let i = 0; i < bin.length; i++) {
-                    arr[i] = bin.charCodeAt(i);
-                }
-                return Array.from(arr);
-            };
+            const decodeB64 = (b64) => Array.from(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
 
             let result;
 
             if (image_b64 && mask_b64) {
-                // Mode 1: Targeted Inpainting (Only modifies the white area of the mask)
+                const safeSteps = Math.min(num_steps || 10, 15);
                 result = await env.AI.run(
                     "@cf/runwayml/stable-diffusion-v1-5-inpainting",
                     {
                         prompt: prompt,
                         image: decodeB64(image_b64),
                         mask: decodeB64(mask_b64),
-                        strength: strength !== undefined ? strength : 0.85,
-                        num_steps: num_steps || 20,
+                        strength: strength !== undefined ? strength : 0.9,
+                        num_steps: safeSteps,
                     }
                 );
             } else if (image_b64) {
-                // Mode 2: General Subtle Image-to-Image
                 result = await env.AI.run(
                     "@cf/lykon/dreamshaper-8-lcm",
                     {
                         prompt: prompt,
                         image_b64: image_b64,
-                        strength: strength !== undefined ? strength : 0.3,
-                        num_steps: num_steps || 8,
-                        guidance: 2.0,
+                        strength: strength !== undefined ? strength : 0.85,
+                        num_steps: Math.min(num_steps || 6, 8),
+                        guidance: 1.8,
                     }
                 );
             } else {
-                // Mode 3: Pure Text-to-Image
+                // Ultra-fast model for making standalone generation passes (ideal for separate assets)
                 result = await env.AI.run(
-                    "@cf/stabilityai/stable-diffusion-xl-base-1.0",
-                    { prompt: prompt }
+                    "@cf/bytedance/stable-diffusion-xl-lightning",
+                    {
+                        prompt: prompt,
+                        num_steps: 4,
+                    }
                 );
             }
 

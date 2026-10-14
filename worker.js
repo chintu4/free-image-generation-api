@@ -2,7 +2,6 @@ export default {
     async fetch(request, env) {
         const url = new URL(request.url);
 
-        // 🚫 Only allow POST requests to /
         if (request.method !== "POST" || url.pathname !== "/") {
             return json({ error: "Not allowed" }, 405);
         }
@@ -18,8 +17,14 @@ export default {
             const aiInputs = { prompt };
 
             if (image_b64) {
-                aiInputs.image_b64 = image_b64;
-                aiInputs.strength = strength || 0.3; // Low strength for subtle modifications
+                // Decode base64 to byte array, then convert to an array of integers for the model
+                const binaryString = atob(image_b64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                aiInputs.image = Array.from(bytes);
+                aiInputs.strength = strength || 0.3; // Subtle edit strength
             }
 
             const result = await env.AI.run(

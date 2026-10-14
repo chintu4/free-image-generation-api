@@ -14,7 +14,6 @@ export default {
                 return json({ error: "Prompt is required" }, 400);
             }
 
-            // Decode helper: converts Base64 string to Uint8Array integer array
             const decodeB64 = (b64) => {
                 const bin = atob(b64);
                 const arr = new Uint8Array(bin.length);
@@ -39,19 +38,19 @@ export default {
                     }
                 );
             } else if (image_b64) {
-                // Mode 2: Subtle Image-to-Image via DreamShaper 8 LCM
+                // Mode 2: General Subtle Image-to-Image
                 result = await env.AI.run(
                     "@cf/lykon/dreamshaper-8-lcm",
                     {
                         prompt: prompt,
                         image_b64: image_b64,
                         strength: strength !== undefined ? strength : 0.3,
-                        num_steps: num_steps || 8, // LCM models only need 6-8 steps
+                        num_steps: num_steps || 8,
                         guidance: 2.0,
                     }
                 );
             } else {
-                // Mode 3: Pure Text-to-Image fallback
+                // Mode 3: Pure Text-to-Image
                 result = await env.AI.run(
                     "@cf/stabilityai/stable-diffusion-xl-base-1.0",
                     { prompt: prompt }

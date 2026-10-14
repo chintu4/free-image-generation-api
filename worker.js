@@ -42,7 +42,6 @@ export default {
                     }
                 );
             } else {
-                // Ultra-fast model for making standalone generation passes (ideal for separate assets)
                 result = await env.AI.run(
                     "@cf/bytedance/stable-diffusion-xl-lightning",
                     {

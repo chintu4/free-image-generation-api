@@ -15,11 +15,11 @@ export default {
             }
 
             // ==========================================================
-            // ROUTE A: Dynamic LLM Layout Planner (Zero Regex Needed!)
+            // ROUTE A: Dynamic Layout Planner (Using active GLM-4.7-Flash)
             // ==========================================================
             if (action === "plan") {
                 const systemPrompt = `You are a JSON Poster Layout Planner for a 768x1024 canvas.
-Analyze the user's poster edit request and return ONLY a valid JSON object (no markdown, no explanation) matching this exact schema:
+Analyze the user's poster edit request and return ONLY a valid JSON object (no markdown, no code blocks, no explanation) matching this exact schema:
 {
   "use_layout_dock": true,
   "top_header_text": "SHORT CATEGORY HEADER OR EMPTY STRING",
@@ -47,19 +47,16 @@ Analyze the user's poster edit request and return ONLY a valid JSON object (no m
 }`;
 
                 const llmResponse = await env.AI.run(
-                    "@cf/meta/llama-3.1-8b-instruct",
+                    "@cf/zai-org/glm-4.7-flash",
                     {
                         messages: [
                             { role: "system", content: systemPrompt },
                             { role: "user", content: prompt }
                         ],
-                        temperature: 0.1,
-                        max_tokens: 512,
                     }
                 );
 
-                // Extract JSON block safely from LLM output
-                const rawText = llmResponse.response || "{}";
+                const rawText = llmResponse.response || llmResponse.result || "{}";
                 const jsonMatch = rawText.match(/\{[\s\S]*\}/);
                 const parsedPlan = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
                 return json(parsedPlan, 200);

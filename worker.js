@@ -8,55 +8,80 @@ export default {
 
         try {
             const body = await request.json();
-            const { prompt, image_b64, mask_b64, strength, num_steps } = body;
+            const { action, prompt } = body;
 
             if (!prompt) {
                 return json({ error: "Prompt is required" }, 400);
             }
 
-            const decodeB64 = (b64) => Array.from(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+            // ==========================================================
+            // ROUTE A: Dynamic LLM Layout Planner (Zero Regex Needed!)
+            // ==========================================================
+            if (action === "plan") {
+                const systemPrompt = `You are a JSON Poster Layout Planner for a 768x1024 canvas.
+Analyze the user's poster edit request and return ONLY a valid JSON object (no markdown, no explanation) matching this exact schema:
+{
+  "use_layout_dock": true,
+  "top_header_text": "SHORT CATEGORY HEADER OR EMPTY STRING",
+  "main_badge": {
+    "show": true,
+    "headline": "SHORT EXACT HEADLINE (MAX 22 CHARS)",
+    "subtext": "SHORT SUBTEXT (MAX 36 CHARS)",
+    "bg_hex": "#CD1834"
+  },
+  "info_pill": {
+    "show": true,
+    "text": "SALARY / PRICE / DATE / COUPON TEXT",
+    "bg_hex": "#107C41"
+  },
+  "qr_code": {
+    "show": true,
+    "label": "SCAN TO APPLY"
+  },
+  "bullet_points": ["PERK OR DETAIL 1", "PERK OR DETAIL 2", "PERK OR DETAIL 3"],
+  "visual_subject": {
+    "show": true,
+    "style": "photorealistic_person OR 2d_illustration",
+    "clean_prompt": "Detailed visual description of ONLY the person, character, or object requested (NO text, NO letters, NO QR codes mentioned)"
+  }
+}`;
 
-            let result;
+                const llmResponse = await env.AI.run(
+                    "@cf/meta/llama-3.1-8b-instruct",
+                    {
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: prompt }
+                        ],
+                        temperature: 0.1,
+                        max_tokens: 512,
+                    }
+                );
 
-            if (image_b64 && mask_b64) {
-                const safeSteps = Math.min(num_steps || 10, 15);
-                result = await env.AI.run(
-                    "@cf/runwayml/stable-diffusion-v1-5-inpainting",
-                    {
-                        prompt: prompt,
-                        image: decodeB64(image_b64),
-                        mask: decodeB64(mask_b64),
-                        strength: strength !== undefined ? strength : 0.9,
-                        num_steps: safeSteps,
-                    }
-                );
-            } else if (image_b64) {
-                result = await env.AI.run(
-                    "@cf/lykon/dreamshaper-8-lcm",
-                    {
-                        prompt: prompt,
-                        image_b64: image_b64,
-                        strength: strength !== undefined ? strength : 0.85,
-                        num_steps: Math.min(num_steps || 6, 8),
-                        guidance: 1.8,
-                    }
-                );
-            } else {
-                result = await env.AI.run(
-                    "@cf/bytedance/stable-diffusion-xl-lightning",
-                    {
-                        prompt: prompt,
-                        num_steps: 4,
-                    }
-                );
+                // Extract JSON block safely from LLM output
+                const rawText = llmResponse.response || "{}";
+                const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+                const parsedPlan = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+                return json(parsedPlan, 200);
             }
+
+            // ==========================================================
+            // ROUTE B: Fast Image Generation (SDXL-Lightning)
+            // ==========================================================
+            const result = await env.AI.run(
+                "@cf/bytedance/stable-diffusion-xl-lightning",
+                {
+                    prompt: prompt,
+                    num_steps: 4,
+                }
+            );
 
             return new Response(result, {
                 headers: { "Content-Type": "image/png" },
             });
 
         } catch (err) {
-            return json({ error: "Failed to generate image", details: err.message }, 500);
+            return json({ error: "Worker execution failed", details: err.message }, 500);
         }
     },
 };

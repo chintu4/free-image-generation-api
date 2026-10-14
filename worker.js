@@ -14,23 +14,32 @@ export default {
                 return json({ error: "Prompt is required" }, 400);
             }
 
-            const aiInputs = { prompt };
+            let result;
 
             if (image_b64) {
-                // Decode base64 to byte array, then convert to an array of integers for the model
+                // Decode base64 string to byte array (uint8 array)
                 const binaryString = atob(image_b64);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
                     bytes[i] = binaryString.charCodeAt(i);
                 }
-                aiInputs.image = Array.from(bytes);
-                aiInputs.strength = strength || 0.3; // Subtle edit strength
-            }
 
-            const result = await env.AI.run(
-                "@cf/stabilityai/stable-diffusion-xl-base-1.0",
-                aiInputs
-            );
+                // Dedicated Image-to-Image model
+                result = await env.AI.run(
+                    "@cf/runwayml/stable-diffusion-v1-5-img2img",
+                    {
+                        prompt: prompt,
+                        image: [...bytes],
+                        strength: strength !== undefined ? strength : 0.35,
+                    }
+                );
+            } else {
+                // Text-to-Image fallback
+                result = await env.AI.run(
+                    "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+                    { prompt: prompt }
+                );
+            }
 
             return new Response(result, {
                 headers: { "Content-Type": "image/jpeg" },
